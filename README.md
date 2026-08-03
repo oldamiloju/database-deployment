@@ -1,6 +1,8 @@
 # database-deployment 
-made password
+This project consists of me deploying and securing three databases using both native installation and Docker.
 
-made a separate user
+The databases are:
 
-database only listens locally 
+- PostgreSQL
+- MySQL
+- MongoDB
