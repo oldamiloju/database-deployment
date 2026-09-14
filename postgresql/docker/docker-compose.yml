@@ -1,20 +1,43 @@
 services:
-  postgres:
+  primary:
     image: postgres:16
-    container_name: postgres-db
-    restart: unless-stopped
-
+    container_name: postgres-primary
     environment:
-      POSTGRES_USER: developer
-      POSTGRES_PASSWORD: 1234
-      POSTGRES_DB: companydb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: mydb
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_INITDB_ARGS: "--wal-level=replica"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./primary-init:/docker-entrypoint-initdb.d
+      - primary_data:/var/lib/postgresql/data
 
+  replica:
+    image: postgres:16
+    container_name: postgres-replica
     ports:
       - "5433:5432"
-
+    environment:
+      PGPASSWORD: replicator_password
+    depends_on:
+      - primary
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init:/docker-entrypoint-initdb.d
+      - replica_data:/var/lib/postgresql/data
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - |
+        until pg_isready -h primary -p 5432 -U postgres; do
+          echo "Waiting for primary database..."
+          sleep 2
+        done
+        rm -rf /var/lib/postgresql/data/*
+        pg_basebackup -h primary -D /var/lib/postgresql/data -U replicator -v -P -R -X stream
+        
+        # FIX: Force the server engine to run under the safe 'postgres' user account
+        exec gosu postgres postgres
 
 volumes:
-  postgres_data:
+  primary_data:
+  replica_data:

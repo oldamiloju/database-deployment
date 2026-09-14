@@ -1,0 +1,27 @@
+services:
+  primary:
+    image: postgres:16
+    container_name: postgres-primary
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: mydb
+    command: |
+      postgres -c wal_level=replica -c max_wal_senders=10 -c max_replication_slots=10
+
+  replica:
+    image: postgres:16
+    container_name: postgres-replica
+    ports:
+      - "5433:5432"
+    environment:
+      PGPASSWORD: replicator_password
+    depends_on:
+      - primary
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - |
+        until pg_isready -h primary -p 5432 -U postgres; do sleep 2; done
+        rm -rf /var/lib/postgresql/data/*
+        pg_basebackup -h primary -D /var/lib/postgresql/data -U replicator -v -P -R -X stream
+        exec postgres
